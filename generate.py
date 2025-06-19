@@ -100,20 +100,41 @@ class CrosswordCreator():
 
     def revise(self, x: Variable, y: Variable):
 
+        # Check for overlapping characters between variables (edges in constraint graph):
+        # Returns (i, j) where:
+        #   i: index of the overlapping character in the first variable
+        #   j: index of the overlapping character in the second variable
         intersection: tuple = self.crossword.overlaps.get((x, y))
-        if intersection:
-            x_domain = []
-            for word_x in self.domains[x]:  # assigned Variable
-                for word_y in self.domains[y]:
-                    if word_x[intersection[0]] == word_y[intersection[1]]:
-                        x_domain.append(word_x)
-                        break
-            revised = len(x_domain) != len(self.domains[x])  # Revised
-            if revised:
-                self.domains[x] = x_domain
-                return True
 
-        return False
+        x_overlapping_char_index = intersection[0]
+        y_overlapping_char_index = intersection[1]
+        revised = False
+        remove_actions = []
+        if intersection:
+            for word_x in self.domains[x]: # words for Variable 'x'
+                for word_y in self.domains[y]: # words for Variable 'y'
+                    if word_x[x_overlapping_char_index] != word_y[y_overlapping_char_index]:
+                        remove_action = lambda: self.domains[x].remove(word_x)
+                        remove_actions.append(remove_action)
+                        if not revised:
+                            revised = True
+        if revised:
+            for remove in remove_actions:
+                remove()
+
+        return revised
+
+        #words_to_remove = set()
+        #if intersection:
+            #for word_x in self.domains[x]:
+                #for word_y in self.domains[y]:
+                    #if word_x[x_overlapping_char_index] != word_y[y_overlapping_char_index]:
+                        #words_to_remove.add(word_x)
+                        #if not revised:
+                            #revised = True
+
+        #if revised:
+            #self.domains[x] -= words_to_remove  # usando diferença de conjuntos
 
     def ac3(self, arcs=None):
 
@@ -243,7 +264,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
 
 
