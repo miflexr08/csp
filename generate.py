@@ -74,10 +74,12 @@ class CrosswordCreator():
         img.save(filename)
 
     def get_arcs(self):
+        # it is possible to build it with List Comprehension
         arcs = list()
         for x in self.crossword.variables:
             for y in self.crossword.variables:
-                if self.crossword.overlaps.__contains__((x, y)):
+                intersection = self.crossword.overlaps.get((x, y))
+                if intersection is not None:
                     arcs.append((x, y))
         return arcs
 
@@ -106,21 +108,35 @@ class CrosswordCreator():
         #   j: index of the overlapping character in the second variable
         intersection: tuple = self.crossword.overlaps.get((x, y))
 
+        #ac3 updates domains when only one possible solution
         x_overlapping_char_index = intersection[0]
         y_overlapping_char_index = intersection[1]
         revised = False
         remove_actions = []
+        consistent_x_values = set()
         if intersection:
-            for word_x in self.domains[x]: # words for Variable 'x'
-                for word_y in self.domains[y]: # words for Variable 'y'
-                    if word_x[x_overlapping_char_index] != word_y[y_overlapping_char_index]:
-                        remove_action = lambda: self.domains[x].remove(word_x)
-                        remove_actions.append(remove_action)
-                        if not revised:
-                            revised = True
-        if revised:
-            for remove in remove_actions:
-                remove()
+
+            # iterate over x domain values to check it there is a y valid intersection value
+            # code is handling 2 Variables that represents an arc together (it is all about arcs!)
+            # one question is: are there inverted duplicated arcs? like (x, y) and (y, x)?
+            for word_x in self.domains[x]: # words/ domain for Variable 'x'
+                #has_y_consistent = False
+                for word_y in self.domains[y]: # words/ domain for Variable 'y'
+                    if word_x[x_overlapping_char_index] == word_y[y_overlapping_char_index]:
+                        #has_y_consistent = True
+                        consistent_x_values.add(word_x)
+
+                if len(self.domains[x]) != len(consistent_x_values):
+                    self.domains[x] = consistent_x_values
+                    revised = True
+                #if not has_y_consistent:
+                    #remove_action = lambda: self.domains[x].remove(word_x)
+                    #remove_actions.append(remove_action)
+                    #if not revised:
+                        #revised = True
+        #if revised:
+            #for remove in remove_actions:
+                #remove()
 
         return revised
 
@@ -143,8 +159,11 @@ class CrosswordCreator():
             arcs = self.get_arcs()
 
         consistent = True
+
+        # 1. a problem getting the arcs correctly
+        # 2. arcs comes with wrong data intentionally
         for arc in arcs:
-            if self.revise(arc[0], arc[1]):
+            if self.revise(arc[0], arc[1]): # it means those 2 Variables are connected
                 if not self.domains[arc[1]]:
                     consistent = False
 
