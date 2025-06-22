@@ -165,19 +165,6 @@ class CrosswordCreator():
         # Aplicar heurística de Degree para desempate (variável com mais vizinhos)
         return max(mrv_candidates, key=lambda var: len(self.crossword.neighbors(var)))
 
-        # taken_var = None
-        # max_neighboors = 0
-        # for var in mrv_candidates:
-        #     neighboors = self.crossword.neighbors(var)
-        #     neighboors_size = len(neighboors)
-        #     if neighboors_size >= max_neighboors:
-        #         max_neighboors = neighboors_size
-        #         taken_var = var
-        #
-        # return taken_var
-
-
-
     def choose(self, assignment, variable, word):
         self.domains[variable] = [word]
         assignment[variable] = word
@@ -196,8 +183,9 @@ class CrosswordCreator():
             word = order_domain_values[0]  # Make Tests with ordered and unordered structure
             self.choose(assignment, variable, word)
 
-            arcs = [(variable, n) for n in self.crossword.neighbors(variable)]
-            arc_consistent = self.ac3(arcs)
+            #arcs = [(variable, n) for n in self.crossword.neighbors(variable)]
+            #arc_consistent = self.ac3(arcs)
+            arc_consistent = self.ac3()
             if arc_consistent:
                 if self.assignment_complete(assignment):
                     return assignment
@@ -207,10 +195,13 @@ class CrosswordCreator():
         else:
             return None
 
-        assignment_result = self.backtrack(assignment)  # Uma Atribuição Numa Stack Frame Acima Não Deu Certo
+        # Uma Atribuição Numa Stack Frame Acima Não Deu Certo
         # 1.1 - We just come here when backtrack finally returns something
         # 1.2 - We always go "back" to the top of the function (remember that)
-        if assignment_result is None:  # Restaurar Estado e Seguir Adiante
+        assignment_result = self.backtrack(assignment)
+
+        # Restaurar Estado e Seguir Adiante
+        if assignment_result is None:
             self.domains = domain_cp
             del assignment[variable]
 
