@@ -143,8 +143,30 @@ class CrosswordCreator():
     def assignment_complete(self, assignment):
         return len(assignment) == len(self.crossword.variables)
 
-    def consistent(self, assignment: dict):
-        return len(assignment.values()) == len(set(assignment.values()))
+    # -> identifies when assignment doesn't meet unary constraints
+    # -> identifies when assignment doesn't meet binary constraints
+    def consistent(self, assignment: dict[Variable, str]):
+
+        meet_unary_constraints = True
+        meet_binary_constraints = True
+        for variable_key_i, word_i in assignment.items(): 
+            if meet_unary_constraints:
+                meet_unary_constraints = len(word_i) == variable_key_i.length
+            for variable_key_j, word_j in assignment.items():
+                if variable_key_i == variable_key_j:
+                    continue
+                if meet_binary_constraints:
+                    intersection = self.crossword.overlaps.get((variable_key_i, variable_key_j))
+                    if intersection is not None:
+                        meet_binary_constraints = word_i[intersection[0]] == word_j[intersection[1]]
+
+            if not meet_unary_constraints and not meet_binary_constraints:
+                break
+
+        duplicated = len(assignment.values()) != len(set(assignment.values()))
+        return (meet_unary_constraints
+                and meet_binary_constraints
+                    and not duplicated)
 
     def select_unassigned_variable(self, assignment: dict):
         assignment_keys = assignment.keys()
@@ -173,10 +195,7 @@ class CrosswordCreator():
         return self.domains.copy()
 
     def backtrack(self, assignment: dict):
-
         domain_cp = self.get_state_copy()
-
-        # tip. Think about Criteria here without looking at it!
         variable = self.select_unassigned_variable(assignment)
         order_domain_values = self.order_domain_values(variable, assignment)
         if len(order_domain_values):
@@ -195,9 +214,10 @@ class CrosswordCreator():
         else:
             return None
 
-        # Uma Atribuição Numa Stack Frame Acima Não Deu Certo
-        # 1.1 - We just come here when backtrack finally returns something
-        # 1.2 - We always go "back" to the top of the function (remember that)
+        # The assignment attempt in a previous recursion level has failed
+        # Note 1: We only reach this point when the recursive backtrack call returns a result
+        # Note 2: The recursive nature of backtracking means execution will always return to
+        #         the caller's context when a recursive call completes
         assignment_result = self.backtrack(assignment)
 
         # Restaurar Estado e Seguir Adiante
@@ -246,5 +266,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
