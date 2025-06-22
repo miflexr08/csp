@@ -108,63 +108,34 @@ class CrosswordCreator():
         #   j: index of the overlapping character in the second variable
         intersection: tuple = self.crossword.overlaps.get((x, y))
 
-        #ac3 updates domains when only one possible solution
         x_overlapping_char_index = intersection[0]
         y_overlapping_char_index = intersection[1]
         revised = False
-        remove_actions = []
+
         consistent_x_values = set()
-        if intersection:
+        for word_x in self.domains[x]:
+            for word_y in self.domains[y]:
+                if word_x[x_overlapping_char_index] == word_y[y_overlapping_char_index]:
+                    consistent_x_values.add(word_x)
 
-            # iterate over x domain values to check it there is a y valid intersection value
-            # code is handling 2 Variables that represents an arc together (it is all about arcs!)
-            # one question is: are there inverted duplicated arcs? like (x, y) and (y, x)?
-            for word_x in self.domains[x]: # words/ domain for Variable 'x'
-                #has_y_consistent = False
-                for word_y in self.domains[y]: # words/ domain for Variable 'y'
-                    if word_x[x_overlapping_char_index] == word_y[y_overlapping_char_index]:
-                        #has_y_consistent = True
-                        consistent_x_values.add(word_x)
-
-                if len(self.domains[x]) != len(consistent_x_values):
-                    self.domains[x] = consistent_x_values
-                    revised = True
-                #if not has_y_consistent:
-                    #remove_action = lambda: self.domains[x].remove(word_x)
-                    #remove_actions.append(remove_action)
-                    #if not revised:
-                        #revised = True
-        #if revised:
-            #for remove in remove_actions:
-                #remove()
+            if len(self.domains[x]) != len(consistent_x_values):
+                self.domains[x] = consistent_x_values
+                revised = True
 
         return revised
 
-        #words_to_remove = set()
-        #if intersection:
-            #for word_x in self.domains[x]:
-                #for word_y in self.domains[y]:
-                    #if word_x[x_overlapping_char_index] != word_y[y_overlapping_char_index]:
-                        #words_to_remove.add(word_x)
-                        #if not revised:
-                            #revised = True
-
-        #if revised:
-            #self.domains[x] -= words_to_remove  # usando diferença de conjuntos
-
-    def ac3(self, arcs=None):
+    def ac3(self, arcs: list[tuple[Variable]]=None):
 
         # First call
         if arcs is None:
             arcs = self.get_arcs()
 
         consistent = True
-
-        # 1. a problem getting the arcs correctly
-        # 2. arcs comes with wrong data intentionally
         for arc in arcs:
-            if self.revise(arc[0], arc[1]): # it means those 2 Variables are connected
-                if not self.domains[arc[1]]:
+            var_x = arc[0]
+            var_y = arc[1]
+            if self.revise(var_x, var_y):
+                if not len(self.domains[var_x]):
                     consistent = False
 
         return consistent
@@ -176,75 +147,76 @@ class CrosswordCreator():
         return len(assignment.values()) == len(set(assignment.values()))
 
     def select_unassigned_variable(self, assignment: dict):
-        unassigned_vars = list()
         assignment_keys = assignment.keys()
+
+        # Aplicar heurística MRV (Minimum Remaining Values)
+        min_domain_size = float('inf')
+        mrv_candidates = []
         for var in self.crossword.variables:
             if not assignment_keys.__contains__(var):
-                unassigned_vars.append(var)
+                var_domain_size = len(self.domains[var])
+                if var_domain_size <= min_domain_size:
+                    min_domain_size = var_domain_size
+                    mrv_candidates.append(var)
 
-        less_remaining = len(self.crossword.words)
-        selected_vars = []
-        for var in unassigned_vars:
-            if len(self.domains[var]) <= less_remaining:
-                less_remaining = len(self.domains[var])
-                selected_vars.append(var)
+        if len(mrv_candidates) == 1:
+            return mrv_candidates[0]
 
-        if len(selected_vars) > 1:
+        # Aplicar heurística de Degree para desempate (variável com mais vizinhos)
+        return max(mrv_candidates, key=lambda var: len(self.crossword.neighbors(var)))
 
-            selected_var = None
-            max_neighboors = 0
-            for var in selected_vars:
-                neighboors = self.crossword.neighbors(var)
-                neighboors_qt = len(neighboors)
-                if neighboors_qt >= max_neighboors:
-                    selected_var = var
-                    max_neighboors = neighboors_qt
+        # taken_var = None
+        # max_neighboors = 0
+        # for var in mrv_candidates:
+        #     neighboors = self.crossword.neighbors(var)
+        #     neighboors_size = len(neighboors)
+        #     if neighboors_size >= max_neighboors:
+        #         max_neighboors = neighboors_size
+        #         taken_var = var
+        #
+        # return taken_var
 
-            return selected_var
 
-        elif len(selected_vars):
-            return selected_vars[0]
+
+    def choose(self, assignment, variable, word):
+        self.domains[variable] = [word]
+        assignment[variable] = word
+
+    def get_state_copy(self):
+        return self.domains.copy()
 
     def backtrack(self, assignment: dict):
 
+        domain_cp = self.get_state_copy()
+
+        # tip. Think about Criteria here without looking at it!
         variable = self.select_unassigned_variable(assignment)
-        neighboors = self.crossword.neighbors(variable)
-
         order_domain_values = self.order_domain_values(variable, assignment)
-        domain_current_state = self.domains.copy()  # Not Sure If It is Necessary to Copy Complete Domain
         if len(order_domain_values):
-            word = order_domain_values[0]  # Make Tests with and without ordering
-            self.domains[variable] = [word]
-            assignment[variable] = word
+            word = order_domain_values[0]  # Make Tests with ordered and unordered structure
+            self.choose(assignment, variable, word)
 
-            # Insert In the get_arcs Function (?)
-            arcs = list()
-            for n in neighboors:
-                arcs.append((variable, n))
-
+            arcs = [(variable, n) for n in self.crossword.neighbors(variable)]
             arc_consistent = self.ac3(arcs)
             if arc_consistent:
                 if self.assignment_complete(assignment):
-                    # base case #B
                     return assignment
-            else:  # A Atribuição Não Deu Certo na Stack Frame Atual
-                # self.domains = domain_current_state
-                self.domains[variable] = domain_current_state[variable] - word
+            elif not arc_consistent: # Stack Frame
+                self.domains[variable].remove(word)
                 del assignment[variable]
         else:
             return None
 
-        result = self.backtrack(assignment)  # Uma Atribuição Numa Stack Frame Acima Não Deu Certo
+        assignment_result = self.backtrack(assignment)  # Uma Atribuição Numa Stack Frame Acima Não Deu Certo
         # 1.1 - We just come here when backtrack finally returns something
         # 1.2 - We always go "back" to the top of the function (remember that)
-        if result is None:  # Restaurar Estado e Seguir Adiante
-            self.domains = domain_current_state
-            # self.domains[variable] = domain_current_state[variable] - word # Is That Right?
+        if assignment_result is None:  # Restaurar Estado e Seguir Adiante
+            self.domains = domain_cp
             del assignment[variable]
 
             return self.backtrack(assignment)
 
-        return result
+        return assignment_result
 
     def order_domain_values(self, var, assignment: dict):
         """
@@ -253,7 +225,7 @@ class CrosswordCreator():
         The first value in the list, for example, should be the one
         that rules out the fewest values among the neighbors of `var`.
         """
-        return self.domains[var]
+        return list(self.domains[var])
 
 
 
