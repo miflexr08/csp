@@ -73,16 +73,6 @@ class CrosswordCreator():
 
         img.save(filename)
 
-    def get_arcs(self) -> list[tuple[Variable, Variable]]:
-        # it is possible to build it with List Comprehension
-        arcs = list()
-        for x in self.crossword.variables:
-            for y in self.crossword.variables:
-                intersection = self.crossword.overlaps.get((x, y))
-                if intersection is not None:
-                    arcs.append((x, y))
-        return arcs
-
     def solve(self):
 
         self.enforce_node_consistency()
@@ -130,20 +120,28 @@ class CrosswordCreator():
         if arcs is None:
             arcs = self.get_arcs()
 
-        consistent = True
         for arc in arcs:
             var_x = arc[0]
             var_y = arc[1]
             if self.revise(var_x, var_y):
-                if not len(self.domains[var_x]):
-                    consistent = False
+                pass
+                # if not len(self.domains[var_x]):
+                #     consistent = False
 
-        return consistent
+    def get_arcs(self) -> list[tuple[Variable, Variable]]:
+        # it is possible to build it with List Comprehension
+        arcs = list()
+        for x in self.crossword.variables:
+            for y in self.crossword.variables:
+                intersection = self.crossword.overlaps.get((x, y))
+                if intersection is not None:
+                    arcs.append((x, y))
+        return arcs
 
     def assignment_complete(self, assignment):
         return len(assignment) == len(self.crossword.variables)
 
-    def consistent(self, assignment: dict[Variable, str]):
+    def consistent(self, assignment: dict[Variable, str]) -> bool:
 
         meet_unary_constraints = True
         meet_binary_constraints = True
@@ -204,12 +202,12 @@ class CrosswordCreator():
             self.choose(assignment, variable, word)
 
             #arcs = [(variable, n) for n in self.crossword.neighbors(variable)]
-            #arc_consistent = self.ac3(arcs)
-            arc_consistent = self.ac3()
-            if arc_consistent:
-                if self.assignment_complete(assignment):
+
+            self.ac3()
+            has_consistency = self.consistent(assignment)
+            if has_consistency and self.assignment_complete(assignment):
                     return assignment
-            elif not arc_consistent:
+            elif not has_consistency:
                 self.domains[variable].remove(word)
                 del assignment[variable]
         else:
