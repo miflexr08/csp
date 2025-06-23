@@ -73,7 +73,7 @@ class CrosswordCreator():
 
         img.save(filename)
 
-    def get_arcs(self):
+    def get_arcs(self) -> list[tuple[Variable, Variable]]:
         # it is possible to build it with List Comprehension
         arcs = list()
         for x in self.crossword.variables:
@@ -124,7 +124,7 @@ class CrosswordCreator():
 
         return revised
 
-    def ac3(self, arcs: list[tuple[Variable]]=None):
+    def ac3(self, arcs: list[tuple[Variable, Variable]]=None):
 
         # First call
         if arcs is None:
@@ -143,13 +143,11 @@ class CrosswordCreator():
     def assignment_complete(self, assignment):
         return len(assignment) == len(self.crossword.variables)
 
-    # -> identifies when assignment doesn't meet unary constraints
-    # -> identifies when assignment doesn't meet binary constraints
     def consistent(self, assignment: dict[Variable, str]):
 
         meet_unary_constraints = True
         meet_binary_constraints = True
-        for variable_key_i, word_i in assignment.items(): 
+        for variable_key_i, word_i in assignment.items():
             if meet_unary_constraints:
                 meet_unary_constraints = len(word_i) == variable_key_i.length
             for variable_key_j, word_j in assignment.items():
@@ -168,18 +166,21 @@ class CrosswordCreator():
                 and meet_binary_constraints
                     and not duplicated)
 
-    def select_unassigned_variable(self, assignment: dict):
-        assignment_keys = assignment.keys()
+    def select_unassigned_variable(self, assignment: dict) -> Variable:
 
         # Aplicar heurística MRV (Minimum Remaining Values)
         min_domain_size = float('inf')
         mrv_candidates = []
         for var in self.crossword.variables:
-            if not assignment_keys.__contains__(var):
-                var_domain_size = len(self.domains[var])
-                if var_domain_size <= min_domain_size:
-                    min_domain_size = var_domain_size
-                    mrv_candidates.append(var)
+            if var in assignment:
+                continue
+
+            var_domain_size = len(self.domains[var])
+            if var_domain_size == min_domain_size:
+                min_domain_size = var_domain_size
+                mrv_candidates.append(var)
+            elif var_domain_size < min_domain_size:
+                mrv_candidates.insert(0, var)
 
         if len(mrv_candidates) == 1:
             return mrv_candidates[0]
@@ -194,7 +195,7 @@ class CrosswordCreator():
     def get_state_copy(self):
         return self.domains.copy()
 
-    def backtrack(self, assignment: dict):
+    def backtrack(self, assignment: dict[Variable, str]):
         domain_cp = self.get_state_copy()
         variable = self.select_unassigned_variable(assignment)
         order_domain_values = self.order_domain_values(variable, assignment)
@@ -208,7 +209,7 @@ class CrosswordCreator():
             if arc_consistent:
                 if self.assignment_complete(assignment):
                     return assignment
-            elif not arc_consistent: # Stack Frame
+            elif not arc_consistent:
                 self.domains[variable].remove(word)
                 del assignment[variable]
         else:
