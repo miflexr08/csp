@@ -129,7 +129,7 @@ class CrosswordCreator():
                 #     consistent = False
 
     def get_arcs(self) -> list[tuple[Variable, Variable]]:
-        # it is possible to build it with List Comprehension
+
         arcs = list()
         for x in self.crossword.variables:
             for y in self.crossword.variables:
@@ -175,9 +175,9 @@ class CrosswordCreator():
 
             var_domain_size = len(self.domains[var])
             if var_domain_size == min_domain_size:
-                min_domain_size = var_domain_size
                 mrv_candidates.append(var)
             elif var_domain_size < min_domain_size:
+                min_domain_size = var_domain_size
                 mrv_candidates.insert(0, var)
 
         if len(mrv_candidates) == 1:
