@@ -96,21 +96,31 @@ class CrosswordCreator():
         # Returns (i, j) where:
         #   i: index of the overlapping character in the first variable
         #   j: index of the overlapping character in the second variable
-        intersection: tuple = self.crossword.overlaps.get((x, y))
+        overlap: tuple = self.crossword.overlaps.get((x, y))
 
-        x_overlapping_char_index = intersection[0]
-        y_overlapping_char_index = intersection[1]
+        # Técnica aprendida 1. descontrução de tupla
+        x_overlap_idx, y_overlap_idx = overlap
+
         revised = False
-
-        consistent_x_values = set()
+        words_to_remove = []
         for word_x in self.domains[x]:
-            for word_y in self.domains[y]:
-                if word_x[x_overlapping_char_index] == word_y[y_overlapping_char_index]:
-                    consistent_x_values.add(word_x)
 
-            if len(self.domains[x]) != len(consistent_x_values):
-                self.domains[x] = consistent_x_values
-                revised = True
+            # Técnica aprendida 2: método any
+            # Verificar se existe pelo menos uma palavra em y que satisfaça a restrição
+            if not any(word_x[x_overlap_idx] == word_y[y_overlap_idx] for word_y in self.domains[y]):
+                words_to_remove.append(word_x)
+
+            # inconsistent_x = True
+            # for word_y in self.domains[y]:
+            #     if word_x[x_overlap_idx] == word_y[y_overlap_idx]:
+            #         inconsistent_x = False
+            # if inconsistent_x:
+            #     words_to_remove.append(word_x)
+
+        if words_to_remove:
+            revised = True
+            for w in words_to_remove:
+                self.domains[x].remove(w)
 
         return revised
 
@@ -120,22 +130,27 @@ class CrosswordCreator():
         if arcs is None:
             arcs = self.get_arcs()
 
+        revised_vars = set()
         for arc in arcs:
-            var_x = arc[0]
-            var_y = arc[1]
-            if self.revise(var_x, var_y):
-                pass
-                # if not len(self.domains[var_x]):
-                #     consistent = False
+            if self.revise(arc[0], arc[1]):
+                revised_vars.add(arc[0])
+
+        arcs = []
+        for var in revised_vars:
+            for n in self.crossword.neighbors(var):
+                arcs.append((n, var))
+
+        if len(arcs):
+            self.ac3(arcs)
 
     def get_arcs(self) -> list[tuple[Variable, Variable]]:
-
         arcs = list()
         for x in self.crossword.variables:
             for y in self.crossword.variables:
                 intersection = self.crossword.overlaps.get((x, y))
                 if intersection is not None:
                     arcs.append((x, y))
+
         return arcs
 
     def assignment_complete(self, assignment):
@@ -201,8 +216,6 @@ class CrosswordCreator():
             word = order_domain_values[0]  # Make Tests with ordered and unordered structure
             self.choose(assignment, variable, word)
 
-            #arcs = [(variable, n) for n in self.crossword.neighbors(variable)]
-
             self.ac3()
             has_consistency = self.consistent(assignment)
             if has_consistency and self.assignment_complete(assignment):
@@ -213,13 +226,7 @@ class CrosswordCreator():
         else:
             return None
 
-        # The assignment attempt in a previous recursion level has failed
-        # Note 1: We only reach this point when the recursive backtrack call returns a result
-        # Note 2: The recursive nature of backtracking means execution will always return to
-        #         the caller's context when a recursive call completes
         assignment_result = self.backtrack(assignment)
-
-        # Restaurar Estado e Seguir Adiante
         if assignment_result is None:
             self.domains = domain_cp
             del assignment[variable]
@@ -229,13 +236,18 @@ class CrosswordCreator():
         return assignment_result
 
     def order_domain_values(self, var, assignment: dict):
-        """
-        Return a list of values in the domain of `var`, in order by
-        the number of values they rule out for neighboring variables.
-        The first value in the list, for example, should be the one
-        that rules out the fewest values among the neighbors of `var`.
-        """
-        return list(self.domains[var])
+        counter = { w: 0 for w in self.domains[var] }
+        neighbors = self.crossword.neighbors(var)
+        for word in self.domains[var]:
+            for n in neighbors:
+                overlap = self.crossword.overlaps.get((var, n))
+                x_overlap_idx, y_overlap_idx = overlap
+                for word_n in self.domains[n]:
+                    if word[x_overlap_idx] != word_n[y_overlap_idx]:
+                        counter[word] += 1
+
+        return sorted(counter, key=lambda k: counter[k])
+
 
 
 
